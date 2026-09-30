@@ -8,7 +8,7 @@ tag k l i x=take(H::hmac k ([0x50,0x33,0x57,l]#(split i:[8][8])#x))
 node : K->[8]->[64]->B->[3]B
 node k l i x=[x,t,x^t] where t=tag k l i x
 down : {n}(fin n)=>K->[8]->[n]B->[3*n]B
-down k l xs=join[node k l i x|i<-is|x<-xs] where is:[n][64];is=[0..]
+down k l xs=join[node k l i x|i<-[0 ...]|x<-xs]
 cand : K->[8]->[64]->Bit->B->B->F
 cand k l i e x t=(e&&t==tag k l i x,x)
 vote : [3]F->F
@@ -25,16 +25,23 @@ heal k l i f=vote[cand k l i (a&&b) a' b',cand k l i (a&&c) a' (a'^c'),cand k l 
  (b,b')=f@1
  (c,c')=f@2
 up : {n}(fin n)=>K->[8]->[3*n]F->[n]F
-up k l xs=[heal k l i g|i<-is|g<-gs] where
- is:[n][64];is=[0..]
- gs:[n][3]F;gs=split xs
+up k l xs=[heal k l i g|i<-[0 ...]|g<-split xs]
 enc4 : K->B->[81]B
 enc4 k x=down k 3(down k 2(down k 1(down k 0 [x])))
 present : {n}(fin n)=>[n]B->[n]F
 present xs=[(True,x)|x<-xs]
 dec4 : K->[81]F->F
 dec4 k xs=(up k 0(up k 1(up k 2(up k 3 xs))))@0
-eraseA : [81]B->[81]F
-eraseA xs=[(i>=27,x)|i<-is|x<-xs] where is:[81][8];is=[0..]
+// Root branch b (0..2) lost: its 27 leaves are flagged absent.
+lose : [2]->[81]B->[81]F
+lose b xs=join[[(j!=b,x)|x<-br]|j<-[0 .. 2]|br<-(split xs:[3][27]B)]
 property roundtrip k x=o&&y==x where (o,y)=dec4 k(present(enc4 k x))
-property one_branch_loss k x=o&&y==x where (o,y)=dec4 k(eraseA(enc4 k x))
+// Any one branch may go. Each of the three candidates gets to decide alone.
+property one_branch_loss k x=and[ok(dec4 k(lose b e))|b<-[0 .. 2]] where
+ e=enc4 k x
+ ok(o,y)=o&&y==x
+// Two branches missing while their slots still hold an older message's
+// (validly tagged) blocks: must reject, not resurrect the old message.
+// A decoder that ignores the presence flags fails this one.
+property stale_two_branch_rejects k x x' = ~o where
+ (o,_)=dec4 k([(False,y)|y<-take`{54}(enc4 k x')]#present(drop`{54}(enc4 k x)))

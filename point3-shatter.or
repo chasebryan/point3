@@ -1,0 +1,55 @@
+edition 2026;
+module point3_shatter {
+  spec majority(a: Word[8], b: Word[8], c: Word[8]) -> Word[8] {
+    if ((a + b) + c) > 1 { 1 } else { 0 }
+  }
+
+  spec lane0(m: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(i + 11 * epoch) % 128] = m[i]
+    }
+  }
+
+  spec lane1(m: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(45 * i + 17 + 29 * epoch) % 128] = m[i]
+    }
+  }
+
+  spec lane2(m: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(61 * i + 73 + 47 * epoch) % 128] = m[i]
+    }
+  }
+
+  spec transfer0(x: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(i + 11 * (epoch + 1)) % 128] =
+        x[(i + 11 * epoch) % 128]
+    }
+  }
+
+  spec transfer1(x: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(45 * i + 17 + 29 * (epoch + 1)) % 128] =
+        x[(45 * i + 17 + 29 * epoch) % 128]
+    }
+  }
+
+  spec transfer2(x: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [(61 * i + 73 + 47 * (epoch + 1)) % 128] =
+        x[(61 * i + 73 + 47 * epoch) % 128]
+    }
+  }
+
+  spec rebuild(a: Word[8]^128, b: Word[8]^128, c: Word[8]^128, epoch: Int) -> Word[8]^128 {
+    for i in 0..128 with out: Word[8]^128 = [0; 128] {
+      out with [i] = majority(
+        a[(i + 11 * epoch) % 128],
+        b[(45 * i + 17 + 29 * epoch) % 128],
+        c[(61 * i + 73 + 47 * epoch) % 128]
+      )
+    }
+  }
+}

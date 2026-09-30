@@ -1,0 +1,40 @@
+module Point3W where
+import Primitive::Symmetric::MAC::HMAC::Instantiations::HMAC_SHA256 as H
+type K=[32][8]
+type B=[16][8]
+type F=(Bit,B)
+tag : K->[8]->[64]->B->B
+tag k l i x=take(H::hmac k ([0x50,0x33,0x57,l]#(split i:[8][8])#x))
+node : K->[8]->[64]->B->[3]B
+node k l i x=[x,t,x^t] where t=tag k l i x
+down : {n}(fin n)=>K->[8]->[n]B->[3*n]B
+down k l xs=join[node k l i x|i<-is|x<-xs] where is:[n][64];is=[0..]
+cand : K->[8]->[64]->Bit->B->B->F
+cand k l i e x t=(e&&t==tag k l i x,x)
+vote : [3]F->F
+vote c=(o&&s,x) where
+ (a,xa)=c@0
+ (b,xb)=c@1
+ (d,xd)=c@2
+ o=a||b||d
+ s=(~a||~b||xa==xb)&&(~a||~d||xa==xd)&&(~b||~d||xb==xd)
+ x=if a then xa else if b then xb else xd
+heal : K->[8]->[64]->[3]F->F
+heal k l i f=vote[cand k l i (a&&b) a' b',cand k l i (a&&c) a' (a'^c'),cand k l i (b&&c) (b'^c') b'] where
+ (a,a')=f@0
+ (b,b')=f@1
+ (c,c')=f@2
+up : {n}(fin n)=>K->[8]->[3*n]F->[n]F
+up k l xs=[heal k l i g|i<-is|g<-gs] where
+ is:[n][64];is=[0..]
+ gs:[n][3]F;gs=split xs
+enc4 : K->B->[81]B
+enc4 k x=down k 3(down k 2(down k 1(down k 0 [x])))
+present : {n}(fin n)=>[n]B->[n]F
+present xs=[(True,x)|x<-xs]
+dec4 : K->[81]F->F
+dec4 k xs=(up k 0(up k 1(up k 2(up k 3 xs))))@0
+eraseA : [81]B->[81]F
+eraseA xs=[(i>=27,x)|i<-is|x<-xs] where is:[81][8];is=[0..]
+property roundtrip k x=o&&y==x where (o,y)=dec4 k(present(enc4 k x))
+property one_branch_loss k x=o&&y==x where (o,y)=dec4 k(eraseA(enc4 k x))

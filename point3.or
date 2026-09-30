@@ -1,0 +1,82 @@
+edition 2026;
+module point3 {
+  spec majority3(c: Word[32]) -> Word[32] {
+    let a: Word[32] = (c >> 2) & 1;
+    let b: Word[32] = (c >> 1) & 1;
+    let d: Word[32] = c & 1;
+    (a & b) | (a & d) | (b & d)
+  }
+
+  spec encode_byte(x: Word[8]) -> Word[32] {
+    let w: Word[32] = x as Word[32];
+    let b7: Word[32] = (w >> 7) & 1;
+    let b6: Word[32] = (w >> 6) & 1;
+    let b5: Word[32] = (w >> 5) & 1;
+    let b4: Word[32] = (w >> 4) & 1;
+    let b3: Word[32] = (w >> 3) & 1;
+    let b2: Word[32] = (w >> 2) & 1;
+    let b1: Word[32] = (w >> 1) & 1;
+    let b0: Word[32] = w & 1;
+    ((b7 * 7) << 21)
+      | ((b6 * 7) << 18)
+      | ((b5 * 7) << 15)
+      | ((b4 * 7) << 12)
+      | ((b3 * 7) << 9)
+      | ((b2 * 7) << 6)
+      | ((b1 * 7) << 3)
+      | (b0 * 7)
+  }
+
+  spec decode_byte(x: Word[32]) -> Word[8] {
+    let b7: Word[32] = majority3((x >> 21) & 7);
+    let b6: Word[32] = majority3((x >> 18) & 7);
+    let b5: Word[32] = majority3((x >> 15) & 7);
+    let b4: Word[32] = majority3((x >> 12) & 7);
+    let b3: Word[32] = majority3((x >> 9) & 7);
+    let b2: Word[32] = majority3((x >> 6) & 7);
+    let b1: Word[32] = majority3((x >> 3) & 7);
+    let b0: Word[32] = majority3(x & 7);
+    let y: Word[32] =
+        (b7 << 7)
+      | (b6 << 6)
+      | (b5 << 5)
+      | (b4 << 4)
+      | (b3 << 3)
+      | (b2 << 2)
+      | (b1 << 1)
+      | b0;
+    y as Word[8]
+  }
+
+  spec encode16(x: Word[8]^16) -> Word[32]^16 {
+    for i in 0..16 with out: Word[32]^16 = [0; 16] {
+      out with [i] = encode_byte(x[i])
+    }
+  }
+
+  spec decode16(x: Word[32]^16) -> Word[8]^16 {
+    for i in 0..16 with out: Word[8]^16 = [0; 16] {
+      out with [i] = decode_byte(x[i])
+    }
+  }
+
+  spec encoded_5a() -> Word[32] { encode_byte(0x5a) }
+  spec clean() -> Word[8] { decode_byte(encode_byte(0x5a)) }
+
+  spec one_bit_fault() -> Word[8] {
+    let clean: Word[32] = encode_byte(0x5a);
+    let damaged: Word[32] = clean ^ (1 << 13);
+    decode_byte(damaged)
+  }
+
+  spec message() -> Word[8]^16 {
+    [
+      0x4f, 0x52, 0x41, 0x4e,
+      0x47, 0x45, 0x2d, 0x50,
+      0x4f, 0x49, 0x4e, 0x54,
+      0x2f, 0x33, 0x21, 0x21,
+    ]
+  }
+
+  spec round_trip() -> Word[8]^16 { decode16(encode16(message())) }
+}
